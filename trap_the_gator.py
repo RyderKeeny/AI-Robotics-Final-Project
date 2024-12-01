@@ -190,6 +190,82 @@ def end_screen(message):
             if event.type == pygame.MOUSEBUTTONDOWN and button.collidepoint(event.pos):
                 main()  # restart the game
 
+### MDP Logic Placeholder ###
+# replace this section with MDP logic
+# - define the states, actions, and transition probabilities for the gator's movement
+# - make a function to calculate the optimal move for the gator based on the MDP policy
+#
+# I think like this (I used the same function format from our hws):
+# def get_optimal_move_mdp(gator_pos, traps):
+#     """
+#     Use MDP logic to determine the optimal move for the gator
+#     Args:
+#         gator_pos (list): Current position of the gator
+#         traps (list): List of trap positions
+#     Returns:
+#         str: Optimal move ("up", "down", "left", "right")
+#     """
+#     # add MDP logic here (defining states and solving for the optimal policy)
+#     return "up"  <- replace with actual optimal move based on MDP
+
+
+### LTL Logic & Adversarial Strategy Placeholder ###
+# replace this section with LTL logic for adversarial strategy
+# - define safety objectives: "Always avoid traps"
+# - define reachability objectives: "Eventually reach the swamp"
+# - use these statements to help the gator's decision-making (MDP)
+#
+# I think like this (I used the same function format from our hws):
+# def satisfies_ltl(mdp_move, gator_pos, traps):
+#     """
+#     Use LTL logic to check if the gator's next move based on MDP satisfies safety and reachability objectives
+#     Args:
+#         mdp_move (str): Move suggested by MDP logic
+#         gator_pos (list): Current position of the gator
+#         traps (list): List of trap positions
+#     Returns:
+#         bool: True if the move satisfies LTL objectives, False otherwise
+#     """
+#     # add LTL-based logic here to determine the safest and most goal-oriented move
+#     return True  <- replace with actual LTL logic to validate the MDP move
+
+
+### combined MDP and LTL Logic ###
+# take the outputs of MDP and LTL logic to determine the gator's best move
+# 
+# 1. **MDP Logic**: 
+#    - determines the optimal move for the gator based on defined states, actions, and transition probabilities
+#    - focuses on minimizing penalties (avoiding traps) & maximizing rewards (escaping to the swamp).
+# 
+# 2. **LTL Logic**:
+#    - validates whether the MDP's suggested move satisfies safety and reachability objectives
+#    - safety objective: the gator should "always avoid traps"
+#    - reachability objective: the gator should "eventually reach the swamp"
+# 
+# 3. **Fallback**:
+#    - if the MDP's suggested move violates LTL objectives, the function explores alternative moves that align with LTL constraints
+#    - if no valid moves exist, the gator remains in its current position (indicating it is trapped), game over
+# 
+# - this combined function ensures that the gator’s behavior is both probabilistically optimized (MDP) and logically constrained (LTL)
+# - the output is the best possible move for the gator that adheres to both probabilistic and logical objectives
+#
+# how I think it could be implemented:
+# def get_best_move(gator_pos, traps):
+#     """
+#     Combines MDP and LTL logic to decide the best move for the gator
+#     Args:
+#         gator_pos (list): Current position of the gator
+#         traps (list): List of trap positions
+#     Returns:
+#         list: The best move for the gator as [row, col]
+#     """
+#     # Step 1: use MDP logic to calculate the optimal move (get_optimal_move_mdp function)
+#     # Step 2: check if the MDP move is good with LTL objectives (satisfies_ltl function)
+#     # Step 3: fallback to alternative moves if the MDP move fails LTL validation
+#     # Step 4: return the best move (or current position if no valid moves exist)
+#     return [gator_pos[0], gator_pos[1]]  <- replace with actual best move based on MDP and LTL logic
+
+
 
 def main():
     global gator_pos, traps
