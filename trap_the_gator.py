@@ -1,29 +1,37 @@
 import pygame
 import sys
+import numpy as np
 
 pygame.init()
 
-# initialize the screen and grid settings
-SCREEN_SIZE = 500  # window size
-GRID_SIZE = 10  # number of rows and columns in the playable grid
-SWAMP_BORDER = 2  # additional rows/columns around the grid for the swamp
-TOTAL_SIZE = GRID_SIZE + 2 * SWAMP_BORDER  # total grid size including the swamp
-CELL_SIZE = SCREEN_SIZE // TOTAL_SIZE  # cell size adjusted for swamp inclusion
+# Initialize the screen and grid settings
+SCREEN_SIZE = 500  # Window size
+GRID_SIZE = 10  # Number of rows and columns in the playable grid
+SWAMP_BORDER = 2  # Additional rows/columns around the grid for the swamp
+TOTAL_SIZE = GRID_SIZE + 2 * SWAMP_BORDER  # Total grid size including the swamp
+CELL_SIZE = SCREEN_SIZE // TOTAL_SIZE  # Cell size adjusted for swamp inclusion
 
-# grid colors
+# Grid colors
 WHITE = (255, 255, 255)
 BLUE = (30, 100, 250)
 GREEN = (10, 100, 32)
 ORANGE = (255, 90, 0)
 
-# initialize game objects
-gator_pos = [SWAMP_BORDER + GRID_SIZE // 2, SWAMP_BORDER + GRID_SIZE // 2]  # gator starts in the middle of the grid
-traps = []  # no initial traps
+# Initialize game objects
+gator_start_pos = [SWAMP_BORDER + GRID_SIZE // 2, SWAMP_BORDER + GRID_SIZE // 2]  # Gator starts in the middle of the grid
+gator_pos = gator_start_pos.copy()
+traps = []  # No initial traps
 
-gator_image = pygame.image.load("Pixel_Gator.png")
-trap_image = pygame.image.load("Trap.png")
-gator_image = pygame.transform.scale(gator_image, (CELL_SIZE, CELL_SIZE))
-trap_image = pygame.transform.scale(trap_image, (CELL_SIZE, CELL_SIZE))
+# Load and scale images
+try:
+    gator_image = pygame.image.load("Pixel_Gator.png")
+    trap_image = pygame.image.load("Trap.png")
+    gator_image = pygame.transform.scale(gator_image, (CELL_SIZE, CELL_SIZE))
+    trap_image = pygame.transform.scale(trap_image, (CELL_SIZE, CELL_SIZE))
+except pygame.error:
+    # If images are not found, use colored rectangles
+    gator_image = None
+    trap_image = None
 
 screen = pygame.display.set_mode((SCREEN_SIZE, SCREEN_SIZE))
 pygame.display.set_caption("Trap the Gator")
@@ -32,117 +40,81 @@ pygame.display.set_caption("Trap the Gator")
 def draw_grid():
     """
     Draw the grid and place objects like the gator and traps.
-    Args:
-        None
-    Returns:
-        None
     """
     screen.fill(GREEN)  # Swamp background
 
-    # grid
-    for row in range(SWAMP_BORDER, SWAMP_BORDER + GRID_SIZE):
-        for col in range(SWAMP_BORDER, SWAMP_BORDER + GRID_SIZE):
+    for row in range(TOTAL_SIZE):
+        for col in range(TOTAL_SIZE):
             rect = pygame.Rect(col * CELL_SIZE, row * CELL_SIZE, CELL_SIZE, CELL_SIZE)
-            pygame.draw.rect(screen, BLUE, rect)  # grid cells
-            pygame.draw.rect(screen, WHITE, rect, 1)  # grid lines
+            if SWAMP_BORDER <= row < SWAMP_BORDER + GRID_SIZE and SWAMP_BORDER <= col < SWAMP_BORDER + GRID_SIZE:
+                pygame.draw.rect(screen, BLUE, rect)  # Playable grid cells
+            else:
+                pygame.draw.rect(screen, GREEN, rect)  # Swamp cells
+            pygame.draw.rect(screen, WHITE, rect, 1)  # Grid lines
 
-            # put objects on the grid
+            # Place objects on the grid
             if [row, col] == gator_pos:
-                screen.blit(gator_image, rect)  # Gator
+                if gator_image:
+                    screen.blit(gator_image, rect)
+                else:
+                    pygame.draw.rect(screen, ORANGE, rect)  # Gator as a colored square
             elif [row, col] in traps:
-                screen.blit(trap_image, rect)  # Trap
-
-
-# THIS WILL BE REPLACED BY MDP & LTL LOGIC
-def move_gator():
-    """
-    Move the gator with a preference for moving off the grid (toward the swamp).
-    Args:
-        None
-    Returns:
-        None
-    """
-    global gator_pos
-    directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]  # up, down, left, right
-
-    # prioritize moves that lead outside the grid
-    for dx, dy in directions:
-        new_pos = [gator_pos[0] + dx, gator_pos[1] + dy]
-        # check if the move leads to the swamp (outside the grid)
-        if not (SWAMP_BORDER <= new_pos[0] < SWAMP_BORDER + GRID_SIZE and
-                SWAMP_BORDER <= new_pos[1] < SWAMP_BORDER + GRID_SIZE):
-            gator_pos = new_pos  # move off the grid
-            return
-
-    # if no move leads off the grid, try valid moves within the grid
-    for dx, dy in directions:
-        new_pos = [gator_pos[0] + dx, gator_pos[1] + dy]
-        if (SWAMP_BORDER <= new_pos[0] < SWAMP_BORDER + GRID_SIZE and
-                SWAMP_BORDER <= new_pos[1] < SWAMP_BORDER + GRID_SIZE and
-                new_pos not in traps):
-            gator_pos = new_pos
-            return
+                if trap_image:
+                    screen.blit(trap_image, rect)
+                else:
+                    pygame.draw.rect(screen, (255, 0, 0), rect)  # Trap as a red square
 
 
 def place_trap(mouse_pos):
     """
     Place a trap at the grid position corresponding to the mouse click.
-    Args:
-        mouse_pos (tuple): (x, y) coordinates of the mouse click.
-    Returns:
-        None
     """
-    # convert mouse position to grid coordinates
     x, y = mouse_pos
     row, col = y // CELL_SIZE, x // CELL_SIZE
     new_trap = [row, col]
 
-    # place trap only in valid cells
-    if new_trap not in traps and new_trap != gator_pos:
+    # Place trap only in valid cells
+    if new_trap not in traps and new_trap != gator_pos and is_playable_cell(new_trap):
         traps.append(new_trap)
+
+
+def is_playable_cell(position):
+    """
+    Check if the position is within the playable grid (not swamp).
+    """
+    row, col = position
+    return SWAMP_BORDER <= row < SWAMP_BORDER + GRID_SIZE and SWAMP_BORDER <= col < SWAMP_BORDER + GRID_SIZE
 
 
 def is_gator_trapped(gator_pos, traps):
     """
     Check if the gator is completely trapped (no valid moves).
-    Args:
-        gator_pos (list): Current position of the gator.
-        traps (list): List of trap positions.
-    Returns:
-        bool: True if the gator is trapped, False otherwise.
     """
-    directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
-    for dx, dy in directions:
-        new_pos = [gator_pos[0] + dx, gator_pos[1] + dy]
-        # check if the move is within the playable grid and not a trap
-        if (SWAMP_BORDER <= new_pos[0] < SWAMP_BORDER + GRID_SIZE and
-                SWAMP_BORDER <= new_pos[1] < SWAMP_BORDER + GRID_SIZE and
-                new_pos not in traps):
-            return False  # found a valid move
-    return True  # no valid moves exist
+    for action in actions:
+        new_pos = get_new_position(gator_pos, action)
+        if is_valid_position(new_pos, traps):
+            return False  # Found a valid move
+    return True  # No valid moves exist
+
 
 def animate_gator_exit():
     """
-    Animate the gator running off the screen before the "You Lose!" screen is shown.
-    Args:
-        None
-    Returns:
-        None
+    Animate the gator running off the screen before showing the "You Lose!" screen.
     """
     global gator_pos
     dx, dy = 0, 0
 
-    # determine the direction in which the gator left the grid
+    # Determine the direction in which the gator left the grid
     if gator_pos[0] < SWAMP_BORDER:
-        dx, dy = -1, 0  # move up
+        dx, dy = -1, 0  # Move up
     elif gator_pos[0] >= SWAMP_BORDER + GRID_SIZE:
-        dx, dy = 1, 0  # move down
+        dx, dy = 1, 0  # Move down
     elif gator_pos[1] < SWAMP_BORDER:
-        dx, dy = 0, -1  # move left
+        dx, dy = 0, -1  # Move left
     elif gator_pos[1] >= SWAMP_BORDER + GRID_SIZE:
-        dx, dy = 0, 1  # move right
+        dx, dy = 0, 1  # Move right
 
-    # animate the gator moving step by step off the screen
+    # Animate the gator moving step by step off the screen
     for _ in range(SWAMP_BORDER + 2):
         gator_pos = [gator_pos[0] + dx, gator_pos[1] + dy]
         draw_grid()
@@ -152,24 +124,22 @@ def animate_gator_exit():
             CELL_SIZE,
             CELL_SIZE,
         )
-        screen.blit(gator_image, rect)  
+        if gator_image:
+            screen.blit(gator_image, rect)
+        else:
+            pygame.draw.rect(screen, ORANGE, rect)
         pygame.display.flip()
         pygame.time.delay(300)
-
 
 
 def end_screen(message):
     """
     Display the end screen with a message and a replay button.
-    Args:
-        message (str): The message to display ("You Win!" or "You Lose!").
-    Returns:
-        None
     """
     font = pygame.font.Font(None, 50)
     button_font = pygame.font.Font(None, 40)
 
-    # message and restart button
+    # Message and restart button
     text = font.render(message, True, WHITE)
     text_rect = text.get_rect(center=(SCREEN_SIZE // 2, SCREEN_SIZE // 3))
     button = pygame.Rect(SCREEN_SIZE // 2 - 75, SCREEN_SIZE // 2, 150, 50)
@@ -177,100 +147,275 @@ def end_screen(message):
     button_text_rect = button_text.get_rect(center=button.center)
 
     while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            if event.type == pygame.MOUSEBUTTONDOWN and button.collidepoint(event.pos):
+                main()  # Restart the game
+
         screen.fill(BLUE)
         screen.blit(text, text_rect)
         pygame.draw.rect(screen, ORANGE, button)
         screen.blit(button_text, button_text_rect)
         pygame.display.flip()
 
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                pygame.quit()
-                sys.exit()
-            if event.type == pygame.MOUSEBUTTONDOWN and button.collidepoint(event.pos):
-                main()  # restart the game
 
-### MDP Logic Placeholder ###
-# replace this section with MDP logic
-# - define the states, actions, and transition probabilities for the gator's movement
-# - make a function to calculate the optimal move for the gator based on the MDP policy
-#
-# I think like this (I used the same function format from our hws):
-# def get_optimal_move_mdp(gator_pos, traps):
-#     """
-#     Use MDP logic to determine the optimal move for the gator
-#     Args:
-#         gator_pos (list): Current position of the gator
-#         traps (list): List of trap positions
-#     Returns:
-#         str: Optimal move ("up", "down", "left", "right")
-#     """
-#     # add MDP logic here (defining states and solving for the optimal policy)
-#     return "up"  <- replace with actual optimal move based on MDP
+# Define possible actions
+actions = ["up", "down", "left", "right"]
 
 
-### LTL Logic & Adversarial Strategy Placeholder ###
-# replace this section with LTL logic for adversarial strategy
-# - define safety objectives: "Always avoid traps"
-# - define reachability objectives: "Eventually reach the swamp"
-# - use these statements to help the gator's decision-making (MDP)
-#
-# I think like this (I used the same function format from our hws):
-# def satisfies_ltl(mdp_move, gator_pos, traps):
-#     """
-#     Use LTL logic to check if the gator's next move based on MDP satisfies safety and reachability objectives
-#     Args:
-#         mdp_move (str): Move suggested by MDP logic
-#         gator_pos (list): Current position of the gator
-#         traps (list): List of trap positions
-#     Returns:
-#         bool: True if the move satisfies LTL objectives, False otherwise
-#     """
-#     # add LTL-based logic here to determine the safest and most goal-oriented move
-#     return True  <- replace with actual LTL logic to validate the MDP move
+def get_new_position(position, action):
+    """
+    Get the new position based on the current position and the action.
+    """
+    row, col = position
+    if action == "up":
+        return [row - 1, col]
+    elif action == "down":
+        return [row + 1, col]
+    elif action == "left":
+        return [row, col - 1]
+    elif action == "right":
+        return [row, col + 1]
+    return position
 
 
-### combined MDP and LTL Logic ###
-# take the outputs of MDP and LTL logic to determine the gator's best move
-# 
-# 1. **MDP Logic**: 
-#    - determines the optimal move for the gator based on defined states, actions, and transition probabilities
-#    - focuses on minimizing penalties (avoiding traps) & maximizing rewards (escaping to the swamp).
-# 
-# 2. **LTL Logic**:
-#    - validates whether the MDP's suggested move satisfies safety and reachability objectives
-#    - safety objective: the gator should "always avoid traps"
-#    - reachability objective: the gator should "eventually reach the swamp"
-# 
-# 3. **Fallback**:
-#    - if the MDP's suggested move violates LTL objectives, the function explores alternative moves that align with LTL constraints
-#    - if no valid moves exist, the gator remains in its current position (indicating it is trapped), game over
-# 
-# - this combined function ensures that the gator’s behavior is both probabilistically optimized (MDP) and logically constrained (LTL)
-# - the output is the best possible move for the gator that adheres to both probabilistic and logical objectives
-#
-# how I think it could be implemented:
-# def get_best_move(gator_pos, traps):
-#     """
-#     Combines MDP and LTL logic to decide the best move for the gator
-#     Args:
-#         gator_pos (list): Current position of the gator
-#         traps (list): List of trap positions
-#     Returns:
-#         list: The best move for the gator as [row, col]
-#     """
-#     # Step 1: use MDP logic to calculate the optimal move (get_optimal_move_mdp function)
-#     # Step 2: check if the MDP move is good with LTL objectives (satisfies_ltl function)
-#     # Step 3: fallback to alternative moves if the MDP move fails LTL validation
-#     # Step 4: return the best move (or current position if no valid moves exist)
-#     return [gator_pos[0], gator_pos[1]]  <- replace with actual best move based on MDP and LTL logic
+def is_valid_position(position, traps):
+    """
+    Check if the new position is valid (inside the playable grid and not a trap).
+    """
+    row, col = position
+    return (
+        SWAMP_BORDER <= row < SWAMP_BORDER + GRID_SIZE and
+        SWAMP_BORDER <= col < SWAMP_BORDER + GRID_SIZE and
+        position not in traps
+    )
 
+
+def is_in_swamp(position):
+    """
+    Check if the position is in the swamp area (outside the playable grid).
+    """
+    row, col = position
+    return not (
+        SWAMP_BORDER <= row < SWAMP_BORDER + GRID_SIZE and
+        SWAMP_BORDER <= col < SWAMP_BORDER + GRID_SIZE
+    )
+
+
+def satisfies_ltl(move, gator_pos, traps):
+    """
+    Use LTL logic to check if the gator's next move based on MDP satisfies safety and reachability objectives.
+    """
+    new_pos = get_new_position(gator_pos, move)
+    # Safety: Always avoid traps
+    if new_pos in traps:
+        return False
+    # Reachability: Eventually reach the swamp
+    if is_in_swamp(new_pos):
+        return True
+    return True  # Continue moving towards the goal
+
+
+def get_best_move(gator_pos, traps, policy):
+    """
+    Decide the best move for the gator based on the optimal policy and LTL constraints.
+    """
+    action = policy.get(tuple(gator_pos))
+    if action is None:
+        return gator_pos  # No valid action found
+
+    # Check if the action satisfies LTL constraints
+    if satisfies_ltl(action, gator_pos, traps):
+        new_pos = get_new_position(gator_pos, action)
+        return new_pos
+    else:
+        # If not, try alternative actions that satisfy LTL
+        for alt_action in actions:
+            if satisfies_ltl(alt_action, gator_pos, traps):
+                alt_new_pos = get_new_position(gator_pos, alt_action)
+                if is_valid_position(alt_new_pos, traps) or is_in_swamp(alt_new_pos):
+                    return alt_new_pos
+        # If no action satisfies LTL, stay in place
+        return gator_pos
+
+
+def value_iteration(traps, gamma=0.9, theta=1e-4):
+    """
+    Perform Value Iteration to compute the value function and derive the policy.
+    Args:
+        traps (list): List of trap positions.
+        gamma (float): Discount factor.
+        theta (float): Threshold for convergence.
+    Returns:
+        value_function (dict): Mapping from state to value.
+        policy (dict): Mapping from state to optimal action.
+    """
+    states = [(row, col) for row in range(TOTAL_SIZE) for col in range(TOTAL_SIZE)]
+    value_function = {state: 0.0 for state in states}
+    policy = {state: None for state in states}
+
+    # Initialize terminal states
+    for state in states:
+        if is_in_swamp(state):
+            value_function[state] = 0.0  # No cost to stay in swamp
+        elif list(state) in traps:
+            value_function[state] = -float('inf')  # Impassable traps
+
+    iteration = 0
+    while True:
+        delta = 0
+        for state in states:
+            if is_in_swamp(state) or list(state) in traps:
+                continue  # Skip terminal and trap states
+
+            row, col = state
+            max_value = -float('inf')
+            best_action = None
+
+            for action in actions:
+                new_pos = get_new_position(list(state), action)
+                new_state = tuple(new_pos)
+
+                # Check if the new position is valid
+                if is_valid_position(new_pos, traps):
+                    reward = -1  # Cost per move
+                    if is_in_swamp(new_pos):
+                        reward = 100  # Reward for escaping
+                    value = reward + gamma * value_function.get(new_state, 0.0)
+                else:
+                    # Attempting to move into a wall or trap
+                    if is_in_swamp(new_pos):
+                        reward = 100  # Escaped
+                        value = reward + gamma * 0.0
+                    else:
+                        reward = -10  # Penalty for hitting a wall or invalid move
+                        value = reward + gamma * value_function[state]
+
+                if value > max_value:
+                    max_value = value
+                    best_action = action
+
+            # Update the value function and policy
+            delta = max(delta, abs(max_value - value_function[state]))
+            value_function[state] = max_value
+            policy[state] = best_action
+
+        iteration += 1
+        if delta < theta:
+            break
+
+    # Removed the print statement for iterations
+    # print(f"Value Iteration converged after {iteration} iterations.")
+    return value_function, policy
+
+
+def compute_policy():
+    """
+    Compute the optimal policy based on current traps.
+    """
+    value_func, optimal_policy = value_iteration(traps)
+    return optimal_policy
+
+
+def move_gator(policy):
+    """
+    Move the gator using the optimal policy and LTL constraints.
+    """
+    global gator_pos
+    gator_pos = get_best_move(gator_pos, traps, policy)
+    # If the gator moves into the swamp, gator_pos is updated accordingly
+
+
+def get_full_path(policy):
+    """
+    Compute the full path the gator will take from its current position to escape based on the policy.
+    Returns:
+        path (list): List of states representing the path.
+    """
+    path = []
+    current_state = tuple(gator_pos)
+    visited = set()
+    max_steps = TOTAL_SIZE * TOTAL_SIZE  # Prevent infinite loops
+
+    for _ in range(max_steps):
+        if is_in_swamp(current_state):
+            path.append(current_state)
+            break
+        if current_state in visited:
+            # Loop detected; gator is stuck
+            path.append(current_state)
+            break
+        visited.add(current_state)
+        action = policy.get(current_state)
+        if action is None:
+            path.append(current_state)
+            break
+        next_state = tuple(get_new_position(list(current_state), action))
+        path.append(current_state)
+        current_state = next_state
+
+    return path
+
+
+def print_full_path(policy):
+    """
+    Print the entire optimal path for the gator based on the current policy.
+    """
+    path = get_full_path(policy)
+    if not path:
+        print("No path found for the gator.")
+        return
+
+    path_description = " -> ".join([str(state) for state in path])
+    print(f"Optimal path for the gator: {path_description}")
+
+
+def print_full_path_with_moves(policy):
+    """
+    Print the entire optimal path for the gator with move directions based on the policy.
+    """
+    path = get_full_path(policy)
+    if not path:
+        print("No path found for the gator.")
+        return
+
+    path_description = ""
+    for i in range(len(path) - 1):
+        current = path[i]
+        next_ = path[i + 1]
+        move = get_move_direction(current, next_)
+        path_description += f"{current} -> ({move}) -> {next_} "
+    path_description += f"{path[-1]}"
+
+    print(f"Optimal path for the gator:\n{path_description}")
+
+
+def get_move_direction(current, next_):
+    """
+    Determine the direction of movement from current state to next state.
+    """
+    row_diff = next_[0] - current[0]
+    col_diff = next_[1] - current[1]
+
+    if row_diff == -1 and col_diff == 0:
+        return "up"
+    elif row_diff == 1 and col_diff == 0:
+        return "down"
+    elif row_diff == 0 and col_diff == -1:
+        return "left"
+    elif row_diff == 0 and col_diff == 1:
+        return "right"
+    return "unknown"
 
 
 def main():
     global gator_pos, traps
-    gator_pos = [SWAMP_BORDER + GRID_SIZE // 2, SWAMP_BORDER + GRID_SIZE // 2]  # reset gator position
-    traps = []  # reset traps
+    gator_pos = gator_start_pos.copy()  # Reset gator position
+    traps = []  # Reset traps
+
+    policy = compute_policy()
 
     clock = pygame.time.Clock()
     while True:
@@ -279,32 +424,30 @@ def main():
                 pygame.quit()
                 sys.exit()
 
-            # mouse click to place traps
+            # Mouse click to place traps
             if event.type == pygame.MOUSEBUTTONDOWN:
                 place_trap(event.pos)
-                move_gator()  # move the gator after the player places a trap
+                policy = compute_policy()  # Recompute policy after placing a trap
+                move_gator(policy)  # Move the gator after the player places a trap
+                print_full_path_with_moves(policy)  # Print the entire optimal path after placing the trap
 
-        # clear screen
-        screen.fill(GREEN)  # Swamp
-
-        # draw the grid and objects
+        # Clear screen
         draw_grid()
 
-        # check for Robot win (Gator escapes to the swamp)
-        if not (SWAMP_BORDER <= gator_pos[0] < SWAMP_BORDER + GRID_SIZE and
-                SWAMP_BORDER <= gator_pos[1] < SWAMP_BORDER + GRID_SIZE):
+        # Check for Gator win (Gator escapes to the swamp)
+        if is_in_swamp(gator_pos):
             animate_gator_exit()
             end_screen("You Lose!")
             return
 
-        # check for Robot loss (Gator is trapped)
+        # Check for Gator loss (Gator is trapped)
         if is_gator_trapped(gator_pos, traps):
             end_screen("You Win!")
             return
 
-        # update display
+        # Update display
         pygame.display.flip()
-        clock.tick(10)
+        clock.tick(5)  # Adjusted to slower frame rate for better visibility
 
 
 if __name__ == "__main__":
